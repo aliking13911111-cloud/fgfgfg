@@ -1,0 +1,52 @@
+name: Build Spatial Android Debug APK
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.7
+
+      - name: Generate Gradle wrapper
+        run: gradle wrapper --gradle-version 8.7
+
+      - name: Download MediaPipe hand model
+        shell: bash
+        run: |
+          mkdir -p app/src/main/assets
+          curl --fail --location --retry 5 --retry-delay 2 --connect-timeout 20 \
+            "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task" \
+            --output app/src/main/assets/hand_landmarker.task
+          test -s app/src/main/assets/hand_landmarker.task
+          ls -lh app/src/main/assets/hand_landmarker.task
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: spatial-android-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
